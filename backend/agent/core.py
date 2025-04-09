@@ -6,6 +6,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import torch
 from typing import List, Dict, Any
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class TelecomAgent:
     def __init__(self):
@@ -19,12 +22,22 @@ class TelecomAgent:
     def setup_llm(self):
         """Initialize the Qwen 2.5 7B model"""
         try:
-            model_name = "Qwen/Qwen1.5-7B"  # Update this to the correct model name/path
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            # Use local model path from environment variable or default to models directory
+            model_path = os.getenv("MODEL_PATH", "backend/models/qwen")
+            
+            print(f"Loading model from: {model_path}")
+            
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_path,
+                trust_remote_code=True,
+                use_fast=False  # Some models require this
+            )
+            
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
+                model_path,
                 device_map="auto",
-                trust_remote_code=True
+                trust_remote_code=True,
+                torch_dtype=torch.float16  # Use half precision to reduce memory usage
             )
             
             # Create a text generation pipeline
@@ -34,10 +47,13 @@ class TelecomAgent:
                 tokenizer=self.tokenizer,
                 max_new_tokens=512,
                 temperature=0.7,
-                device_map="auto"
+                device_map="auto",
+                torch_dtype=torch.float16
             )
             
             self.llm = HuggingFacePipeline(pipeline=pipe)
+            print("Model loaded successfully!")
+            
         except Exception as e:
             print(f"Error setting up LLM: {str(e)}")
             raise
